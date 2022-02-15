@@ -1,0 +1,78 @@
+buildscript {
+    ext.kotlin_version = '1.6.10'
+    ext.vertx_version = "4.2.4"
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+
+    group = "SimpleRestApi"
+    version = "1.0.0"
+}
+
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version "$kotlin_version"
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+
+dependencies {
+    // Kotlin
+    implementation "org.jetbrains.kotlin:kotlin-stdlib"
+
+    // Vertx Core
+    implementation "io.vertx:vertx-core:$vertx_version"
+    implementation "io.vertx:vertx-lang-kotlin:$vertx_version"
+
+    // Vertx Web
+    implementation "io.vertx:vertx-web:$vertx_version"
+
+    // Vertx Rxjava
+    implementation "io.vertx:vertx-rx-java3:$vertx_version"
+    implementation "io.vertx:vertx-rx-java3-gen:$vertx_version"
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes 'Implementation-Title': group
+        attributes 'Implementation-Version': archiveVersion
+        attributes 'Main-Class': 'AppKt'
+    }
+
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+task cleanAndJar {
+    group = "build"
+    description = "Clean and create jar"
+
+    dependsOn clean
+    dependsOn jar
+}
+
+compileKotlin {
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_11
+    }
+}

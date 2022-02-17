@@ -24,7 +24,7 @@ class HttpServerVerticle : AbstractVerticle() {
             get("/api/users").handler(this@HttpServerVerticle::getUsers)
             post("/api/users").handler(BodyHandler.create()).handler(this@HttpServerVerticle::setUser)
             put("/api/users").handler(BodyHandler.create()).handler(this@HttpServerVerticle::updateUser)
-            delete("/api/users").handler(BodyHandler.create()).handler(this@HttpServerVerticle::deleteUser)
+            delete("/api/users").handler(this@HttpServerVerticle::deleteUser)
         }
 
         vertx

@@ -16,3 +16,5 @@ bin
 bin-default
 
 cache
+
+env.properties

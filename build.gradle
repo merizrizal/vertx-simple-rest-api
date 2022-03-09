@@ -1,3 +1,5 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
 buildscript {
     ext.kotlin_version = '1.6.10'
     ext.vertx_version = '4.2.4'
@@ -40,6 +42,19 @@ dependencies {
     // Vertx Rxjava
     implementation "io.vertx:vertx-rx-java3:$vertx_version"
     implementation "io.vertx:vertx-rx-java3-gen:$vertx_version"
+
+    // Vertx Postgresql
+    implementation "io.vertx:vertx-pg-client:$vertx_version"
+    // Scram SASL SCRAM-SHA-256
+    implementation 'com.ongres.scram:client:2.1'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs += ["build/generated/sources/java"]
+        }
+    }
 }
 
 jar {
@@ -56,11 +71,29 @@ jar {
     }
 }
 
+task generateConfig(type: Copy) {
+    from "${projectDir}/src/main/resources/template/Config.java.template"
+    into "${buildDir}/generated/sources/java/config"
+
+    def props = new Properties()
+    file("env.properties").withInputStream { props.load(it) }
+
+    filter(ReplaceTokens, tokens: [
+        'PG_HOST': props.getProperty('pg.host'),
+        'PG_DATABASE':  props.getProperty('pg.database'),
+        'PG_USER':  props.getProperty('pg.user'),
+        'PG_PASSWORD':  props.getProperty('pg.password')
+    ])
+
+    rename 'Config.java.template', 'Config.java'
+}
+
 task cleanAndJar {
     group = 'build'
     description = 'Clean and create jar'
 
     dependsOn clean
+    dependsOn generateConfig
     dependsOn jar
 }
 
@@ -68,4 +101,8 @@ compileKotlin {
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11
     }
+}
+
+compileJava {
+    dependsOn generateConfig
 }

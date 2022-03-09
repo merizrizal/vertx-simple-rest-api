@@ -1,0 +1,8 @@
+package config;
+
+public class Config {
+    public static final String PG_HOST = "@PG_HOST@";
+    public static final String PG_DATABASE = "@PG_DATABASE@";
+    public static final String PG_USER = "@PG_USER@";
+    public static final String PG_PASSWORD = "@PG_PASSWORD@";
+}

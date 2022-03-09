@@ -52,7 +52,7 @@ dependencies {
 sourceSets {
     main {
         java {
-            srcDirs += ["build/generated/sources/java"]
+            srcDirs += ["${buildDir}/generated/sources/java"]
         }
     }
 }

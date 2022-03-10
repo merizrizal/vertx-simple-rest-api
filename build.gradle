@@ -2,7 +2,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 
 buildscript {
     ext.kotlin_version = '1.6.10'
-    ext.vertx_version = '4.2.4'
+    ext.vertx_version = '4.2.5'
 
     repositories {
         mavenCentral()
@@ -93,7 +93,6 @@ task cleanAndJar {
     description = 'Clean and create jar'
 
     dependsOn clean
-    dependsOn generateConfig
     dependsOn jar
 }
 

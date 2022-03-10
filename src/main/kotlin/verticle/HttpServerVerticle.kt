@@ -14,17 +14,6 @@ import io.vertx.rxjava3.sqlclient.Tuple
 import io.vertx.sqlclient.PoolOptions
 
 class HttpServerVerticle : AbstractVerticle() {
-    private val users = JsonObject().put(
-            "users",
-            JsonObject().put(
-                "tonys",
-                JsonObject().apply {
-                    put("user_id", "tonys")
-                    put("user_name", "Tony Stark")
-                    put("name_alias", "Iron Man")
-                    put("company", "Stark Industries")
-                }))
-
     private lateinit var pgPoolClient: PgPool
 
     override fun start(promise: Promise<Void>) {

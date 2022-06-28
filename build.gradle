@@ -1,8 +1,8 @@
 import org.apache.tools.ant.filters.ReplaceTokens
 
 buildscript {
-    ext.kotlin_version = '1.6.10'
-    ext.vertx_version = '4.2.5'
+    ext.kotlin_version = '1.7.0'
+    ext.vertx_version = '4.3.1'
 
     repositories {
         mavenCentral()

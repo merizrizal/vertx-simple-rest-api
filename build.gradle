@@ -43,10 +43,8 @@ dependencies {
     implementation "io.vertx:vertx-rx-java3:$vertx_version"
     implementation "io.vertx:vertx-rx-java3-gen:$vertx_version"
 
-    // Vertx Postgresql
-    implementation "io.vertx:vertx-pg-client:$vertx_version"
-    // Scram SASL SCRAM-SHA-256
-    implementation 'com.ongres.scram:client:2.1'
+    // Vertx Redis
+    implementation "io.vertx:vertx-redis-client:$vertx_version"
 }
 
 sourceSets {
@@ -79,10 +77,9 @@ task generateConfig(type: Copy) {
     file("env.properties").withInputStream { props.load(it) }
 
     filter(ReplaceTokens, tokens: [
-        'PG_HOST': props.getProperty('pg.host'),
-        'PG_DATABASE':  props.getProperty('pg.database'),
-        'PG_USER':  props.getProperty('pg.user'),
-        'PG_PASSWORD':  props.getProperty('pg.password')
+        'REDIS_HOST': props.getProperty('redis.host'),
+        'REDIS_DATABASE':  props.getProperty('redis.database'),
+        'REDIS_PASSWORD':  props.getProperty('redis.password')
     ])
 
     rename 'Config.java.template', 'Config.java'

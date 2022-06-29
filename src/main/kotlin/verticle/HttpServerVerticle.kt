@@ -2,8 +2,7 @@ package verticle
 
 import config.Config
 import io.reactivex.rxjava3.core.Maybe
-import io.reactivex.rxjava3.core.Single
-import io.vertx.core.Future
+import io.reactivex.rxjava3.core.Observable
 import io.vertx.core.Promise
 import io.vertx.core.json.JsonObject
 import io.vertx.redis.client.RedisOptions
@@ -13,15 +12,22 @@ import io.vertx.rxjava3.ext.web.RoutingContext
 import io.vertx.rxjava3.ext.web.handler.BodyHandler
 import io.vertx.rxjava3.redis.client.Redis
 import io.vertx.rxjava3.redis.client.RedisAPI
+import io.vertx.rxjava3.redis.client.Response
 
 class HttpServerVerticle : AbstractVerticle() {
-    private lateinit var redis: Redis
+    private lateinit var redisApi: RedisAPI
 
     override fun start(promise: Promise<Void>) {
         val redisOptions = RedisOptions()
             .setConnectionString("redis://:${Config.REDIS_PASSWORD}@${Config.REDIS_HOST}/${Config.REDIS_DATABASE}")
 
-        redis = Redis(io.vertx.redis.client.Redis.createClient(vertx.delegate, redisOptions))
+        Redis(io.vertx.redis.client.Redis.createClient(vertx.delegate, redisOptions))
+            .rxConnect()
+            .subscribe(
+                { redisConnection ->
+                    redisApi = RedisAPI.api(redisConnection)
+                },
+                { failure -> promise.fail(failure.cause) })
 
         val router = Router.router(vertx).apply {
             get("/api/users").handler(this@HttpServerVerticle::getUsers)
@@ -41,59 +47,51 @@ class HttpServerVerticle : AbstractVerticle() {
 
     private fun getUsers(context: RoutingContext) {
         var response: JsonObject
+        var count = 0
+        var dataSize = 0
+        val users = ArrayList<JsonObject>()
 
-        response = JsonObject().apply {
-            put("success", true)
-            put("data", true)
-        }
-
-        putResponse(context, 200, response)
-    }
-
-    private fun setUser(context: RoutingContext) {
-        var response: JsonObject
-
-        val userId = context.request().getParam("user_id")
-        val userName = context.request().getParam("user_name")
-        val nameAlias = context.request().getParam("name_alias")
-        val company = context.request().getParam("company")
-
-        redis
-            .rxConnect()
-            .subscribe(
-                { redisConnection ->
-                    RedisAPI.api(redisConnection)
-                        .rxHmset(ArrayList<String>().apply {
-                            add("heroes:${userId}")
-                            add("userName")
-                            add(userName)
-                            add("nameAlias")
-                            add(nameAlias)
-                            add("company")
-                            add(company)
-                        })
-                        .subscribe(
-                            {
-                                response = JsonObject().apply {
-                                    put("success", true)
-                                    put("action", "insert")
-                                }
-
-                                putResponse(context, 200, response)
-
-                                redisConnection.rxClose()
-                            },
-                            {
-                                response = JsonObject().apply {
-                                    put("success", false)
-                                    put("message", it.message)
-                                }
-
-                                putResponse(context, 500, response)
-
-                                redisConnection.rxClose()
-
+        redisApi
+            .rxKeys("heroes:*")
+            .toObservable()
+            .map { keys ->
+                ArrayList<Observable<Response>>().apply {
+                    keys.forEach {
+                        add(redisApi
+                            .rxHmget(ArrayList<String>().apply {
+                                add(it.toString())
+                                add("userId")
+                                add("userName")
+                                add("nameAlias")
+                                add("company")
                             })
+                            .toObservable())
+                    }
+                }
+            }
+            .flatMap {
+                dataSize = it.size
+                Observable.concat(it)
+            }
+            .subscribe(
+                {
+                    count++
+                    val data = it.iterator()
+                    users.add(JsonObject().apply {
+                        put("userId", data.next().toString())
+                        put("userName", data.next().toString())
+                        put("nameAlias", data.next().toString())
+                        put("company", data.next().toString())
+                    })
+
+                    if (count >= dataSize) {
+                        response = JsonObject().apply {
+                            put("success", true)
+                            put("data", users)
+                        }
+
+                        putResponse(context, 200, response)
+                    }
                 },
                 {
                     response = JsonObject().apply {
@@ -105,6 +103,46 @@ class HttpServerVerticle : AbstractVerticle() {
                 })
     }
 
+    private fun setUser(context: RoutingContext) {
+        var response: JsonObject
+
+        val userId = context.request().getParam("user_id")
+        val userName = context.request().getParam("user_name")
+        val nameAlias = context.request().getParam("name_alias")
+        val company = context.request().getParam("company")
+
+        redisApi
+            .rxHmset(ArrayList<String>().apply {
+                add("heroes:${userId}")
+                add("userId")
+                add(userId)
+                add("userName")
+                add(userName)
+                add("nameAlias")
+                add(nameAlias)
+                add("company")
+                add(company)
+            })
+            .subscribe(
+                {
+                    response = JsonObject().apply {
+                        put("success", true)
+                        put("action", "insert")
+                    }
+
+                    putResponse(context, 200, response)
+                },
+                {
+                    response = JsonObject().apply {
+                        put("success", false)
+                        put("message", it.message)
+                    }
+
+                    putResponse(context, 500, response)
+
+                })
+    }
+
     private fun updateUser(context: RoutingContext) {
         var response: JsonObject
 
@@ -113,73 +151,58 @@ class HttpServerVerticle : AbstractVerticle() {
         val nameAlias = context.request().getParam("name_alias")
         val company = context.request().getParam("company")
 
-        redis
-            .rxConnect()
-            .subscribe(
-                { redisConnection ->
-                    val redisApi = RedisAPI.api(redisConnection)
+        redisApi
+            .rxHmget(ArrayList<String>().apply {
+                add("heroes:${userId}")
+                add("userName")
+            })
+            .toObservable()
+            .map {
+                null != it.iterator().next()
+            }
+            .flatMapMaybe { exist ->
+                if (exist) {
                     redisApi
-                        .rxHmget(ArrayList<String>().apply {
+                        .rxHmset(ArrayList<String>().apply {
                             add("heroes:${userId}")
-                            add("userName")
-                        })
-                        .toObservable()
-                        .map {
-                            null != it.iterator().next()
-                        }
-                        .flatMapMaybe { exist ->
-                            if (exist) {
-                                redisApi
-                                    .rxHmset(ArrayList<String>().apply {
-                                        add("heroes:${userId}")
 
-                                        if (null != userName) {
-                                            add("userName")
-                                            add(userName)
-                                        }
+                            add("userId")
+                            add(userId)
 
-                                        if (null != nameAlias) {
-                                            add("nameAlias")
-                                            add(nameAlias)
-                                        }
-
-                                        if (null != company) {
-                                            add("company")
-                                            add(company)
-                                        }
-                                    })
-                            } else {
-                                Maybe.just(false)
+                            if (null != userName) {
+                                add("userName")
+                                add(userName)
                             }
+
+                            if (null != nameAlias) {
+                                add("nameAlias")
+                                add(nameAlias)
+                            }
+
+                            if (null != company) {
+                                add("company")
+                                add(company)
+                            }
+                        })
+                } else {
+                    Maybe.just(false)
+                }
+            }
+            .subscribe(
+                {
+                    response = if (it is Boolean && !it) {
+                        JsonObject().apply {
+                            put("success", false)
+                            put("message", "Data doesn't exist")
                         }
-                        .subscribe(
-                            {
-                                response = if (it is Boolean && !it) {
-                                    JsonObject().apply {
-                                        put("success", false)
-                                        put("message", "Data doesn't exist")
-                                    }
-                                } else {
-                                    JsonObject().apply {
-                                        put("success", true)
-                                        put("action", "update")
-                                    }
-                                }
+                    } else {
+                        JsonObject().apply {
+                            put("success", true)
+                            put("action", "update")
+                        }
+                    }
 
-                                putResponse(context, 200, response)
-
-                                redisConnection.rxClose()
-                            },
-                            {
-                                response = JsonObject().apply {
-                                    put("success", false)
-                                    put("message", it.message)
-                                }
-
-                                putResponse(context, 500, response)
-
-                                redisConnection.rxClose()
-                            })
+                    putResponse(context, 200, response)
                 },
                 {
                     response = JsonObject().apply {

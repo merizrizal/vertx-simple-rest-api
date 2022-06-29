@@ -218,6 +218,27 @@ class HttpServerVerticle : AbstractVerticle() {
         var response: JsonObject
 
         val userId = context.request().getParam("user_id")
+
+        redisApi
+            .rxDel(ArrayList<String>().apply { add("heroes:$userId") })
+            .subscribe(
+                {
+                    response = JsonObject().apply {
+                        put("success", true)
+                        put("action", "delete")
+                    }
+
+                    putResponse(context, 200, response)
+                },
+                {
+                    response = JsonObject().apply {
+                        put("success", false)
+                        put("message", it.message)
+                    }
+
+                    putResponse(context, 500, response)
+
+                })
     }
 
     private fun putResponse(context: RoutingContext, statuscode: Int, response: JsonObject) {

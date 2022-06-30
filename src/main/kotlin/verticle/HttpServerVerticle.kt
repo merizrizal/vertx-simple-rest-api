@@ -10,7 +10,6 @@ import io.vertx.rxjava3.ext.web.Router
 import io.vertx.rxjava3.ext.web.RoutingContext
 import io.vertx.rxjava3.ext.web.handler.BodyHandler
 import io.vertx.rxjava3.pgclient.PgPool
-import io.vertx.rxjava3.sqlclient.SqlConnection
 import io.vertx.rxjava3.sqlclient.Tuple
 import io.vertx.sqlclient.PoolOptions
 

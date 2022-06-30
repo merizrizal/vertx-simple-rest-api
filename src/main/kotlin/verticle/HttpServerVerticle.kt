@@ -10,6 +10,7 @@ import io.vertx.rxjava3.ext.web.Router
 import io.vertx.rxjava3.ext.web.RoutingContext
 import io.vertx.rxjava3.ext.web.handler.BodyHandler
 import io.vertx.rxjava3.pgclient.PgPool
+import io.vertx.rxjava3.sqlclient.SqlConnection
 import io.vertx.rxjava3.sqlclient.Tuple
 import io.vertx.sqlclient.PoolOptions
 
@@ -51,42 +52,33 @@ class HttpServerVerticle : AbstractVerticle() {
         var response: JsonObject
 
         pgPoolClient.rxGetConnection()
+            .flatMap { sqlConnection ->
+                sqlConnection.query("SELECT * FROM heroes")
+                    .rxExecute()
+                    .map { rows ->
+                        val data = JsonArray().apply {
+                            rows.forEach { row ->
+                                add(JsonObject().apply {
+                                    put("user_id", row.getString("user_id"))
+                                    put("user_name", row.getString("user_name"))
+                                    put("name_alias", row.getString("name_alias"))
+                                    put("company", row.getString("company"))
+                                })
+                            }
+                        }
+
+                        sqlConnection.close()
+                        data
+                    }
+            }
             .subscribe(
-                { sqlConnection ->
-                    sqlConnection.query("SELECT * FROM heroes")
-                        .rxExecute()
-                        .subscribe(
-                            { rows ->
-                                val data = JsonArray()
+                { data ->
+                    response = JsonObject().apply {
+                        put("success", true)
+                        put("data", data)
+                    }
 
-                                for (row in rows) {
-                                    data.add(JsonObject().apply {
-                                        put("user_id", row.getString("user_id"))
-                                        put("user_name", row.getString("user_name"))
-                                        put("name_alias", row.getString("name_alias"))
-                                        put("company", row.getString("company"))
-                                    })
-                                }
-
-                                response = JsonObject().apply {
-                                    put("success", true)
-                                    put("data", data)
-                                }
-
-                                putResponse(context, 200, response)
-
-                                sqlConnection.close()
-                            },
-                            {
-                                response = JsonObject().apply {
-                                    put("success", false)
-                                    put("error", it.message)
-                                }
-
-                                putResponse(context, 500, response)
-
-                                sqlConnection.close()
-                            })
+                    putResponse(context, 200, response)
                 },
                 {
                     response = JsonObject().apply {
@@ -108,32 +100,23 @@ class HttpServerVerticle : AbstractVerticle() {
         val company = context.request().getParam("company")
 
         pgPoolClient.rxGetConnection()
+            .flatMap { sqlConnection ->
+                sqlConnection
+                    .preparedQuery("INSERT INTO heroes(user_id, user_name, name_alias, company) " +
+                        "VALUES ($1, $2, $3, $4)")
+                    .rxExecute(Tuple.of(userId, userName, nameAlias, company))
+                    .map {
+                        sqlConnection.close()
+                    }
+            }
             .subscribe(
-                { sqlConnection ->
-                    sqlConnection.preparedQuery("INSERT INTO heroes(user_id, user_name, name_alias, company) " +
-                            "VALUES ($1, $2, $3, $4)")
-                        .rxExecute(Tuple.of(userId, userName, nameAlias, company))
-                        .subscribe(
-                            {
-                                response = JsonObject().apply {
-                                    put("success", true)
-                                    put("action", "insert")
-                                }
+                {
+                    response = JsonObject().apply {
+                        put("success", true)
+                        put("action", "insert")
+                    }
 
-                                putResponse(context, 200, response)
-
-                                sqlConnection.close()
-                            },
-                            {
-                                response = JsonObject().apply {
-                                    put("success", false)
-                                    put("error", it.message)
-                                }
-
-                                putResponse(context, 500, response)
-
-                                sqlConnection.close()
-                            })
+                    putResponse(context, 200, response)
                 },
                 {
                     response = JsonObject().apply {
@@ -155,33 +138,23 @@ class HttpServerVerticle : AbstractVerticle() {
         val company = context.request().getParam("company")
 
         pgPoolClient.rxGetConnection()
+            .flatMap { sqlConnection ->
+                sqlConnection.preparedQuery("UPDATE heroes " +
+                        "SET user_name=$1, name_alias=$2, company=$3 " +
+                        "WHERE user_id=$4")
+                    .rxExecute(Tuple.of(userName, nameAlias, company, userId))
+                    .map {
+                        sqlConnection.close()
+                    }
+            }
             .subscribe(
-                { sqlConnection ->
-                    sqlConnection.preparedQuery("UPDATE heroes " +
-                            "SET user_name=$1, name_alias=$2, company=$3 " +
-                            "WHERE user_id=$4")
-                        .rxExecute(Tuple.of(userName, nameAlias, company, userId))
-                        .subscribe(
-                            {
-                                response = JsonObject().apply {
-                                    put("success", true)
-                                    put("action", "update")
-                                }
+                {
+                    response = JsonObject().apply {
+                        put("success", true)
+                        put("action", "update")
+                    }
 
-                                putResponse(context, 200, response)
-
-                                sqlConnection.close()
-                            },
-                            {
-                                response = JsonObject().apply {
-                                    put("success", false)
-                                    put("error", it.message)
-                                }
-
-                                putResponse(context, 500, response)
-
-                                sqlConnection.close()
-                            })
+                    putResponse(context, 200, response)
                 },
                 {
                     response = JsonObject().apply {
@@ -200,31 +173,21 @@ class HttpServerVerticle : AbstractVerticle() {
         val userId = context.request().getParam("user_id")
 
         pgPoolClient.rxGetConnection()
+            .flatMap { sqlConnection ->
+                sqlConnection.preparedQuery("DELETE FROM heroes WHERE user_id=$1")
+                    .rxExecute(Tuple.of(userId))
+                    .map {
+                        sqlConnection.close()
+                    }
+            }
             .subscribe(
-                { sqlConnection ->
-                    sqlConnection.preparedQuery("DELETE FROM heroes WHERE user_id=$1")
-                        .rxExecute(Tuple.of(userId))
-                        .subscribe(
-                            {
-                                response = JsonObject().apply {
-                                    put("success", true)
-                                    put("action", "delete")
-                                }
+                {
+                    response = JsonObject().apply {
+                        put("success", true)
+                        put("action", "delete")
+                    }
 
-                                putResponse(context, 200, response)
-
-                                sqlConnection.close()
-                            },
-                            {
-                                response = JsonObject().apply {
-                                    put("success", false)
-                                    put("error", it.message)
-                                }
-
-                                putResponse(context, 500, response)
-
-                                sqlConnection.close()
-                            })
+                    putResponse(context, 200, response)
                 },
                 {
                     response = JsonObject().apply {
@@ -233,8 +196,7 @@ class HttpServerVerticle : AbstractVerticle() {
                     }
 
                     putResponse(context, 500, response)
-                }
-            )
+                })
     }
 
     private fun putResponse(context: RoutingContext, statuscode: Int, response: JsonObject) {

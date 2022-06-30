@@ -56,7 +56,7 @@ class HttpServerVerticle : AbstractVerticle() {
                 sqlConnection.query("SELECT * FROM heroes")
                     .rxExecute()
                     .map { rows ->
-                        val data = JsonArray().apply {
+                        JsonArray().apply {
                             rows.forEach { row ->
                                 add(JsonObject().apply {
                                     put("user_id", row.getString("user_id"))
@@ -66,9 +66,9 @@ class HttpServerVerticle : AbstractVerticle() {
                                 })
                             }
                         }
-
+                    }
+                    .doFinally {
                         sqlConnection.close()
-                        data
                     }
             }
             .subscribe(
@@ -105,7 +105,7 @@ class HttpServerVerticle : AbstractVerticle() {
                     .preparedQuery("INSERT INTO heroes(user_id, user_name, name_alias, company) " +
                         "VALUES ($1, $2, $3, $4)")
                     .rxExecute(Tuple.of(userId, userName, nameAlias, company))
-                    .map {
+                    .doFinally {
                         sqlConnection.close()
                     }
             }
@@ -143,7 +143,7 @@ class HttpServerVerticle : AbstractVerticle() {
                         "SET user_name=$1, name_alias=$2, company=$3 " +
                         "WHERE user_id=$4")
                     .rxExecute(Tuple.of(userName, nameAlias, company, userId))
-                    .map {
+                    .doFinally {
                         sqlConnection.close()
                     }
             }
@@ -176,7 +176,7 @@ class HttpServerVerticle : AbstractVerticle() {
             .flatMap { sqlConnection ->
                 sqlConnection.preparedQuery("DELETE FROM heroes WHERE user_id=$1")
                     .rxExecute(Tuple.of(userId))
-                    .map {
+                    .doFinally {
                         sqlConnection.close()
                     }
             }
